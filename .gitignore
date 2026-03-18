@@ -1,0 +1,28 @@
+# R data files
+*.qs
+*.Rds
+*.RData
+.Rhistory
+.RData
+.Rproj.user
+
+# Raw data
+data/raw/
+data/processed/
+
+# renv
+renv/library/
+renv/staging/
+renv/sandbox/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# API keys
+.Renviron
