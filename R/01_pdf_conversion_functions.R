@@ -39,13 +39,17 @@ convert_pdfs_to_markdown <- function(pdf_dir, output_dir, overwrite = FALSE) {
   if (!dir.exists(output_dir)) dir.create(output_dir, recursive = TRUE)
   output_dir <- normalizePath(output_dir)
 
-  pdf_files <- list.files(pdf_dir, pattern = "\\.pdf$", full.names = TRUE,
-                          ignore.case = TRUE)
+  pdf_files <- list.files(pdf_dir,
+    pattern = "\\.pdf$", full.names = TRUE,
+    ignore.case = TRUE
+  )
 
   if (length(pdf_files) == 0) {
     cli::cli_warn("No PDF files found in {.path {pdf_dir}}.")
-    return(tibble::tibble(pdf_file = character(), md_file = character(),
-                          status = character()))
+    return(tibble::tibble(
+      pdf_file = character(), md_file = character(),
+      status = character()
+    ))
   }
 
   cli::cli_alert_info("Found {length(pdf_files)} PDF file{?s} in {.path {pdf_dir}}.")
@@ -216,8 +220,10 @@ read_all_markdown_papers <- function(md_dir) {
 
   if (length(md_files) == 0) {
     cli::cli_warn("No markdown files found in {.path {md_dir}}.")
-    return(tibble::tibble(file_name = character(), md_path = character(),
-                          content = character()))
+    return(tibble::tibble(
+      file_name = character(), md_path = character(),
+      content = character()
+    ))
   }
 
   tibble::tibble(

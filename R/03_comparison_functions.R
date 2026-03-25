@@ -145,14 +145,18 @@ compute_confusion_matrix <- function(comparison_df,
 #'
 #' @return A named numeric vector with elements `lower` and `upper`.
 wilson_ci <- function(x, n, conf_level = 0.95) {
-  if (n == 0) return(c(lower = NA_real_, upper = NA_real_))
+  if (n == 0) {
+    return(c(lower = NA_real_, upper = NA_real_))
+  }
   z <- qnorm(1 - (1 - conf_level) / 2)
   p_hat <- x / n
   centre <- (p_hat + z^2 / (2 * n)) / (1 + z^2 / n)
   margin <- (z * sqrt(p_hat * (1 - p_hat) / n + z^2 / (4 * n^2))) /
-              (1 + z^2 / n)
-  c(lower = round(max(centre - margin, 0), 3),
-    upper = round(min(centre + margin, 1), 3))
+    (1 + z^2 / n)
+  c(
+    lower = round(max(centre - margin, 0), 3),
+    upper = round(min(centre + margin, 1), 3)
+  )
 }
 
 #' Summarise screening comparison metrics
@@ -174,18 +178,18 @@ summarise_comparison <- function(comparison_df,
   cm <- compute_confusion_matrix(comparison_df, positive = positive)
 
   n <- cm$tp + cm$fp + cm$tn + cm$fn
-  accuracy    <- (cm$tp + cm$tn) / n
+  accuracy <- (cm$tp + cm$tn) / n
   sensitivity <- cm$tp / max(cm$tp + cm$fn, 1)
   specificity <- cm$tn / max(cm$tn + cm$fp, 1)
-  precision   <- cm$tp / max(cm$tp + cm$fp, 1)
-  f1          <- 2 * (precision * sensitivity) /
-                   max(precision + sensitivity, 1e-10)
+  precision <- cm$tp / max(cm$tp + cm$fp, 1)
+  f1 <- 2 * (precision * sensitivity) /
+    max(precision + sensitivity, 1e-10)
 
   # Cohen's kappa
   p_observed <- accuracy
   p_expected <- (
     ((cm$tp + cm$fp) / n) * ((cm$tp + cm$fn) / n) +
-    ((cm$tn + cm$fn) / n) * ((cm$tn + cm$fp) / n)
+      ((cm$tn + cm$fn) / n) * ((cm$tn + cm$fp) / n)
   )
   kappa <- (p_observed - p_expected) / max(1 - p_expected, 1e-10)
 

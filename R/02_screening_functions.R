@@ -312,12 +312,18 @@ init_chat <- function(system_prompt,
   provider <- match.arg(provider)
 
   switch(provider,
-    anthropic = ellmer::chat_anthropic(system_prompt = system_prompt,
-                                       model = model),
-    openai    = ellmer::chat_openai(system_prompt = system_prompt,
-                                    model = model),
-    google    = ellmer::chat_google(system_prompt = system_prompt,
-                                    model = model)
+    anthropic = ellmer::chat_anthropic(
+      system_prompt = system_prompt,
+      model = model
+    ),
+    openai = ellmer::chat_openai(
+      system_prompt = system_prompt,
+      model = model
+    ),
+    google = ellmer::chat_google(
+      system_prompt = system_prompt,
+      model = model
+    )
   )
 }
 
@@ -403,7 +409,7 @@ screen_abstracts_batch <- function(citations_df,
                                    model = NULL,
                                    parallel = FALSE) {
   schema <- define_abstract_screening_schema(criteria_names)
-  chat   <- init_chat(
+  chat <- init_chat(
     system_prompt = build_abstract_system_prompt(criteria),
     provider = provider,
     model = model
@@ -415,7 +421,8 @@ screen_abstracts_batch <- function(citations_df,
 
   map_fn <- if (parallel) {
     rlang::check_installed("furrr",
-      reason = "is required for parallel screening")
+      reason = "is required for parallel screening"
+    )
     furrr::future_map
   } else {
     purrr::map
@@ -423,7 +430,8 @@ screen_abstracts_batch <- function(citations_df,
 
   results <- map_fn(
     cli::cli_progress_along(citations_df$title,
-                            name = "Screening abstracts"),
+      name = "Screening abstracts"
+    ),
     \(i) {
       tryCatch(
         screen_single_abstract(
@@ -438,9 +446,9 @@ screen_abstracts_batch <- function(citations_df,
           )
           list(
             criteria_evaluation = glue::glue("Error: {e$message}"),
-            decision   = "include",  # default to include on error
+            decision = "include", # default to include on error
             confidence = "low",
-            reason     = glue::glue("Screening error — included by default: {e$message}")
+            reason = glue::glue("Screening error — included by default: {e$message}")
           )
         }
       )
@@ -480,7 +488,7 @@ screen_papers_batch <- function(papers_df,
                                 model = NULL,
                                 parallel = FALSE) {
   schema <- define_screening_schema(criteria_names)
-  chat   <- init_screening_chat(criteria, provider = provider, model = model)
+  chat <- init_screening_chat(criteria, provider = provider, model = model)
 
   cli::cli_alert_info(
     "Full-text screening {nrow(papers_df)} paper{?s} with {provider}..."
@@ -488,7 +496,8 @@ screen_papers_batch <- function(papers_df,
 
   map_fn <- if (parallel) {
     rlang::check_installed("furrr",
-      reason = "is required for parallel screening")
+      reason = "is required for parallel screening"
+    )
     furrr::future_map
   } else {
     purrr::map
@@ -505,9 +514,9 @@ screen_papers_batch <- function(papers_df,
           )
           list(
             criteria_evaluation = glue::glue("Error: {e$message}"),
-            decision   = NA_character_,
+            decision = NA_character_,
             confidence = NA_character_,
-            reason     = glue::glue("Error: {e$message}")
+            reason = glue::glue("Error: {e$message}")
           )
         }
       )

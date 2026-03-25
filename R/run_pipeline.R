@@ -97,34 +97,35 @@ source(here::here("R", "04_extraction_functions.R"))
 #'   - `summary` (if `excel_path` provided): metrics tibble (one row per
 #'     screened stage)
 run_pipeline <- function(citations_csv = NULL,
-                         pdf_dir       = here::here("data", "raw", "pdfs"),
-                         md_dir        = here::here("data", "processed", "markdown"),
-                         excel_path    = NULL,
+                         pdf_dir = here::here("data", "raw", "pdfs"),
+                         md_dir = here::here("data", "processed", "markdown"),
+                         excel_path = NULL,
                          criteria,
-                         criteria_names       = NULL,
+                         criteria_names = NULL,
                          extraction_variables = NULL,
-                         human_id_col         = NULL,
-                         human_decision_col   = NULL,
-                         include_value        = "include",
-                         exclude_value        = "exclude",
-                         provider     = "anthropic",
-                         model        = NULL,
-                         id_col       = NULL,
-                         title_col    = "title",
+                         human_id_col = NULL,
+                         human_decision_col = NULL,
+                         include_value = "include",
+                         exclude_value = "exclude",
+                         provider = "anthropic",
+                         model = NULL,
+                         id_col = NULL,
+                         title_col = "title",
                          abstract_col = "abstract",
                          overwrite_md = FALSE,
-                         parallel     = FALSE,
-                         n_workers    = 4L,
+                         parallel = FALSE,
+                         n_workers = 4L,
                          save_results = TRUE) {
-
   cli::cli_h1("AI Systematic Review Screening Pipeline")
 
   # Set up parallel backend if requested
   if (parallel) {
     rlang::check_installed("furrr",
-      reason = "is required for parallel screening")
+      reason = "is required for parallel screening"
+    )
     rlang::check_installed("future",
-      reason = "is required for parallel screening")
+      reason = "is required for parallel screening"
+    )
     future::plan(future::multisession, workers = n_workers)
     cli::cli_alert_info(
       "Parallel mode enabled: {n_workers} worker{?s}."
@@ -157,10 +158,12 @@ run_pipeline <- function(citations_csv = NULL,
     )
 
     n_included_abstract <- sum(
-      abstract_results$decision == "include", na.rm = TRUE
+      abstract_results$decision == "include",
+      na.rm = TRUE
     )
     n_excluded_abstract <- sum(
-      abstract_results$decision == "exclude", na.rm = TRUE
+      abstract_results$decision == "exclude",
+      na.rm = TRUE
     )
     cli::cli_alert_success(
       "Abstract screening complete: {n_included_abstract} included, ",
@@ -202,8 +205,11 @@ run_pipeline <- function(citations_csv = NULL,
   # Full-text prep: PDF → Markdown conversion
   # ----------------------------------------------------------------
   cli::cli_h2(
-    if (!is.null(citations_csv)) "Stage 2: Full-Text Screening" else
+    if (!is.null(citations_csv)) {
+      "Stage 2: Full-Text Screening"
+    } else {
       "Step 1: Full-Text Screening"
+    }
   )
 
   cli::cli_h3("PDF to Markdown Conversion")
@@ -268,8 +274,11 @@ run_pipeline <- function(citations_csv = NULL,
   # ----------------------------------------------------------------
   if (!is.null(extraction_variables)) {
     cli::cli_h2(
-      if (!is.null(citations_csv)) "Stage 3: Data Extraction" else
+      if (!is.null(citations_csv)) {
+        "Stage 3: Data Extraction"
+      } else {
         "Step 2: Data Extraction"
+      }
     )
 
     included_papers <- fulltext_results |>
@@ -338,19 +347,19 @@ run_pipeline <- function(citations_csv = NULL,
     ft_summary <- summarise_comparison(ft_comparison, stage = "fulltext")
 
     output$comparison <- ft_comparison
-    summary_list      <- list(ft_summary)
+    summary_list <- list(ft_summary)
 
     # Abstract stage comparison (if available)
     if (!is.null(output$abstract_screening)) {
       abs_comparison <- compare_screening_decisions(
-        llm_results        = output$abstract_screening |>
+        llm_results = output$abstract_screening |>
           dplyr::rename(file_name = citation_id),
-        human_results      = human_data,
-        llm_id_col         = "file_name",
-        human_id_col       = human_id_col,
+        human_results = human_data,
+        llm_id_col = "file_name",
+        human_id_col = human_id_col,
         human_decision_col = human_decision_col,
-        include_value      = include_value,
-        exclude_value      = exclude_value
+        include_value = include_value,
+        exclude_value = exclude_value
       )
       abs_summary <- summarise_comparison(abs_comparison, stage = "abstract")
       summary_list <- c(list(abs_summary), summary_list)
@@ -391,4 +400,3 @@ run_pipeline <- function(citations_csv = NULL,
   cli::cli_h1("Pipeline Complete")
   output
 }
-

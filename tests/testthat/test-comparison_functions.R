@@ -59,8 +59,10 @@ test_that("summarise_comparison includes confidence intervals", {
   )
 
   metrics <- summarise_comparison(comparison_df)
-  expect_true(all(c("sensitivity_lower", "sensitivity_upper",
-                    "specificity_lower", "specificity_upper") %in% names(metrics)))
+  expect_true(all(c(
+    "sensitivity_lower", "sensitivity_upper",
+    "specificity_lower", "specificity_upper"
+  ) %in% names(metrics)))
   # CIs should be numeric and within [0, 1]
   expect_true(metrics$sensitivity_lower >= 0 && metrics$sensitivity_lower <= 1)
   expect_true(metrics$sensitivity_upper >= 0 && metrics$sensitivity_upper <= 1)

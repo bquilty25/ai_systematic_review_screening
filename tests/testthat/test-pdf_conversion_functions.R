@@ -20,7 +20,7 @@ test_that("read_markdown_paper errors on missing file", {
 })
 
 test_that("read_all_markdown_papers returns expected tibble structure", {
-  tmp_dir  <- tempdir()
+  tmp_dir <- tempdir()
   md_subdir <- file.path(tmp_dir, "test_md_papers")
   dir.create(md_subdir, showWarnings = FALSE)
 
@@ -107,7 +107,7 @@ test_that("read_citation_csv errors when required columns are missing", {
   tmp <- tempfile(fileext = ".csv")
   readr::write_csv(
     tibble::tibble(title = "Some title", year = 2020),
-    tmp  # no 'abstract' column
+    tmp # no 'abstract' column
   )
 
   expect_error(
