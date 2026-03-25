@@ -3,18 +3,18 @@
 #' Wrappers around the Python `opendataloader-pdf` tool for converting
 #' scientific paper PDFs to markdown format suitable for LLM processing.
 
-#' Check that opendataloader-pdf is installed and accessible
+#' Check that opendataloader-pdf CLI is installed and accessible
+#'
+#' Looks for the `opendataloader-pdf` executable on PATH (installed via
+#' `pipx install opendataloader-pdf`).
 #'
 #' @return TRUE invisibly if the tool is available, errors otherwise.
 check_opendataloader_installed <- function() {
-  result <- tryCatch(
-    system2("pip", args = c("show", "opendataloader-pdf"), stdout = TRUE, stderr = TRUE),
-    error = function(e) NULL
-  )
-  if (is.null(result) || !any(grepl("Name: opendataloader-pdf", result))) {
+  cli_path <- Sys.which("opendataloader-pdf")
+  if (nchar(cli_path) == 0) {
     cli::cli_abort(c(
-      "x" = "{.pkg opendataloader-pdf} is not installed.",
-      "i" = "Install it with: {.code pip install opendataloader-pdf}",
+      "x" = "{.pkg opendataloader-pdf} CLI not found on PATH.",
+      "i" = "Install it with: {.code pipx install opendataloader-pdf}",
       "i" = "Requires Python 3.10+ and Java 11+."
     ))
   }
@@ -72,34 +72,26 @@ convert_pdfs_to_markdown <- function(pdf_dir, output_dir, overwrite = FALSE) {
     to_convert <- pdf_files
   }
 
-  # Run opendataloader-pdf conversion
+  # Run opendataloader-pdf conversion (one file at a time to handle spaces in
+  # filenames and to report per-file progress)
   if (length(to_convert) > 0) {
     cli::cli_alert_info("Converting {length(to_convert)} PDF{?s} to markdown...")
 
-    exit_code <- system2(
-      "python",
-      args = c(
-        "-c",
-        shQuote(paste0(
-          "import opendataloader_pdf; ",
-          "opendataloader_pdf.convert(",
-          "input_path=", deparse(to_convert), ", ",
-          "output_dir='", output_dir, "', ",
-          "format='markdown'",
-          ")"
-        ))
-      ),
-      stdout = TRUE,
-      stderr = TRUE
-    )
+    cli_bin <- Sys.which("opendataloader-pdf")
 
-    status_attr <- attr(exit_code, "status")
-    if (!is.null(status_attr) && status_attr != 0) {
-      cli::cli_warn(c(
-        "!" = "opendataloader-pdf exited with status {status_attr}.",
-        "i" = "Output: {paste(exit_code, collapse = '\\n')}"
-      ))
-    }
+    purrr::walk(to_convert, function(pdf_path) {
+      cli::cli_alert_info("  {basename(pdf_path)}")
+      exit_code <- system2(
+        cli_bin,
+        args   = c("-f", "markdown", "-o", shQuote(output_dir), shQuote(pdf_path)),
+        stdout = FALSE,
+        stderr = FALSE
+      )
+      if (!is.null(exit_code) && exit_code != 0) {
+        cli::cli_warn("Failed to convert {.path {basename(pdf_path)}} (exit {exit_code}).")
+      }
+    })
+
   }
 
   # Build results tibble
@@ -107,14 +99,6 @@ convert_pdfs_to_markdown <- function(pdf_dir, output_dir, overwrite = FALSE) {
     output_dir,
     paste0(tools::file_path_sans_ext(basename(pdf_files)), ".md")
   )
-  status <- dplyr::case_when(
-    file.exists(actual_md) & !overwrite & file.exists(expected_md) &
-      pdf_files %in% pdf_files[file.exists(expected_md)] ~ "skipped",
-    file.exists(actual_md) ~ "converted",
-    TRUE ~ "failed"
-  )
-
-  # Simpler status logic
   status <- ifelse(file.exists(actual_md), "success", "failed")
 
   tibble::tibble(
