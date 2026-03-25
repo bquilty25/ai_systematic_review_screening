@@ -209,6 +209,73 @@ read_citation_csv <- function(csv_path,
   raw
 }
 
+#' Read citation data from a RIS file for abstract screening
+#'
+#' Parses a RIS-format reference file (as exported from Ovid MEDLINE, PubMed,
+#' Embase, etc.) into a tidy tibble suitable for abstract screening. Uses the
+#' `synthesisr` package to handle RIS parsing. Title and abstract fields are
+#' standardised; a sequential `citation_id` is generated unless a DOI or
+#' accession number is available.
+#'
+#' @param ris_path Character. Path to the `.ris` file.
+#' @param id_col Character or NULL. If non-NULL, the name of the synthesisr
+#'   output column to use as `citation_id` (e.g. `"doi"`, `"accession"`).
+#'   If NULL (default), a sequential integer is generated.
+#'
+#' @return A tibble with columns: `citation_id`, `title`, `abstract`, plus
+#'   any additional columns returned by `synthesisr::read_refs()`.
+read_citation_ris <- function(ris_path, id_col = NULL) {
+  if (!file.exists(ris_path)) {
+    cli::cli_abort("RIS file not found: {.path {ris_path}}")
+  }
+
+  if (!requireNamespace("synthesisr", quietly = TRUE)) {
+    cli::cli_abort(c(
+      "x" = "Package {.pkg synthesisr} is required to read RIS files.",
+      "i" = "Install it with: {.code install.packages('synthesisr')}"
+    ))
+  }
+
+  raw <- synthesisr::read_refs(ris_path) |>
+    tibble::as_tibble()
+
+  # synthesisr uses 'title' and 'abstract' already; ensure they exist
+  if (!"title" %in% names(raw)) {
+    cli::cli_abort(c(
+      "x" = "No {.field title} column found after parsing {.path {basename(ris_path)}}.",
+      "i" = "Available columns: {.val {names(raw)}}"
+    ))
+  }
+  if (!"abstract" %in% names(raw)) {
+    cli::cli_warn(
+      "No {.field abstract} column found in {.path {basename(ris_path)}}; abstract screening will default to inclusion."
+    )
+    raw <- raw |> dplyr::mutate(abstract = NA_character_)
+  }
+
+  # Generate or extract citation ID
+  if (!is.null(id_col)) {
+    if (!id_col %in% names(raw)) {
+      cli::cli_abort(c(
+        "x" = "ID column {.val {id_col}} not found.",
+        "i" = "Available columns: {.val {names(raw)}}"
+      ))
+    }
+    raw <- raw |> dplyr::rename(citation_id = dplyr::all_of(id_col))
+  } else {
+    raw <- raw |> dplyr::mutate(citation_id = dplyr::row_number(), .before = 1)
+  }
+
+  raw <- raw |>
+    dplyr::mutate(dplyr::across(dplyr::all_of(c("title", "abstract")), as.character))
+
+  cli::cli_alert_success(
+    "Loaded {nrow(raw)} citation{?s} from {.path {basename(ris_path)}}."
+  )
+
+  raw
+}
+
 #' Read all markdown papers from a directory
 #'
 #' @param md_dir Character. Path to directory containing markdown files.

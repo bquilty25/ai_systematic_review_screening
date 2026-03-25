@@ -138,3 +138,74 @@ test_that("read_citation_csv accepts custom column name mappings", {
 
   unlink(tmp)
 })
+
+# ============================================================
+# read_citation_ris
+# ============================================================
+
+make_test_ris <- function(n = 3) {
+  tmp <- tempfile(fileext = ".ris")
+  entries <- purrr::map_chr(seq_len(n), \(i) {
+    glue::glue(
+      "TY  - JOUR\n",
+      "TI  - Test Title {i}\n",
+      "AB  - Abstract text for paper {i}.\n",
+      "AU  - Author, A\n",
+      "Y1  - 2024\n",
+      "ER  -\n"
+    )
+  })
+  writeLines(paste(entries, collapse = "\n"), tmp)
+  tmp
+}
+
+test_that("read_citation_ris errors when file does not exist", {
+  expect_error(
+    read_citation_ris("/nonexistent/path.ris"),
+    "not found"
+  )
+})
+
+test_that("read_citation_ris returns a tibble with required columns", {
+  skip_if_not_installed("synthesisr")
+  tmp <- make_test_ris(3)
+  result <- read_citation_ris(tmp)
+
+  expect_s3_class(result, "tbl_df")
+  expect_true(all(c("citation_id", "title", "abstract") %in% names(result)))
+  expect_equal(nrow(result), 3)
+
+  unlink(tmp)
+})
+
+test_that("read_citation_ris generates sequential citation_id by default", {
+  skip_if_not_installed("synthesisr")
+  tmp <- make_test_ris(2)
+  result <- read_citation_ris(tmp)
+
+  expect_equal(result$citation_id, 1:2)
+
+  unlink(tmp)
+})
+
+test_that("read_citation_ris title and abstract are character", {
+  skip_if_not_installed("synthesisr")
+  tmp <- make_test_ris(2)
+  result <- read_citation_ris(tmp)
+
+  expect_type(result$title, "character")
+  expect_type(result$abstract, "character")
+
+  unlink(tmp)
+})
+
+test_that("read_citation_ris errors when id_col not found", {
+  skip_if_not_installed("synthesisr")
+  tmp <- make_test_ris(2)
+  expect_error(
+    read_citation_ris(tmp, id_col = "nonexistent_col"),
+    "not found"
+  )
+  unlink(tmp)
+})
+

@@ -44,10 +44,13 @@ source(here::here("R", "04_extraction_functions.R"))
 #'   If `citations_csv = NULL`, the abstract screening stage is skipped and
 #'   the pipeline runs full-text screening only (original behaviour).
 #'
-#' @param citations_csv Character or NULL. Path to a CSV with title+abstract
-#'   citation data for stage-1 abstract screening. Requires at least `title`
-#'   and `abstract` columns (configurable via `title_col` and
-#'   `abstract_col`). If NULL, skips abstract screening. Default NULL.
+#' @param citations_csv Character or NULL. Path to a CSV **or RIS** file
+#'   containing title+abstract citation data for stage-1 abstract screening.
+#'   File type is detected automatically by extension (`.ris` → RIS parser
+#'   via `synthesisr`; anything else → CSV parser). For CSV files, at
+#'   minimum `title` and `abstract` columns are required (configurable via
+#'   `title_col` and `abstract_col`). If NULL, skips abstract screening.
+#'   Default NULL.
 #' @param pdf_dir Character. Path to directory containing PDF files.
 #'   Default `data/raw/pdfs`.
 #' @param md_dir Character. Path to directory for markdown output.
@@ -141,12 +144,17 @@ run_pipeline <- function(citations_csv = NULL,
   if (!is.null(citations_csv)) {
     cli::cli_h2("Stage 1: Abstract Screening")
 
-    citations_df <- read_citation_csv(
-      csv_path     = citations_csv,
-      id_col       = id_col,
-      title_col    = title_col,
-      abstract_col = abstract_col
-    )
+    is_ris <- grepl("\\.ris$", citations_csv, ignore.case = TRUE)
+    if (is_ris) {
+      citations_df <- read_citation_ris(ris_path = citations_csv, id_col = id_col)
+    } else {
+      citations_df <- read_citation_csv(
+        csv_path     = citations_csv,
+        id_col       = id_col,
+        title_col    = title_col,
+        abstract_col = abstract_col
+      )
+    }
 
     abstract_results <- screen_abstracts_batch(
       citations_df   = citations_df,
