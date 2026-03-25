@@ -1,7 +1,10 @@
 #' Comparison Functions
 #'
-#' Compare LLM screening decisions against a human manual extraction
-#' spreadsheet to assess agreement and performance metrics.
+#' Compare LLM screening decisions (abstract stage and/or full-text stage)
+#' against a human reference standard to assess agreement and performance
+#' metrics. Per-metric 95% confidence intervals are computed using the
+#' Wilson score method (Wilson 1927), consistent with the otto-SR evaluation
+#' methodology (Cao et al. 2025).
 
 #' Load the human screening/extraction Excel sheet
 #'
@@ -129,24 +132,54 @@ compute_confusion_matrix <- function(comparison_df,
   )
 }
 
+#' Compute a Wilson score confidence interval
+#'
+#' Returns the Wilson (1927) score 95% CI for a proportion. This method
+#' is preferred over the normal approximation (Wald) for small samples and
+#' extreme proportions, and is the method used in the otto-SR paper (Cao
+#' et al. 2025) via the `binom` package.
+#'
+#' @param x Integer. Number of successes.
+#' @param n Integer. Number of trials.
+#' @param conf_level Numeric. Confidence level. Default 0.95.
+#'
+#' @return A named numeric vector with elements `lower` and `upper`.
+wilson_ci <- function(x, n, conf_level = 0.95) {
+  if (n == 0) return(c(lower = NA_real_, upper = NA_real_))
+  z <- qnorm(1 - (1 - conf_level) / 2)
+  p_hat <- x / n
+  centre <- (p_hat + z^2 / (2 * n)) / (1 + z^2 / n)
+  margin <- (z * sqrt(p_hat * (1 - p_hat) / n + z^2 / (4 * n^2))) /
+              (1 + z^2 / n)
+  c(lower = round(max(centre - margin, 0), 3),
+    upper = round(min(centre + margin, 1), 3))
+}
+
 #' Summarise screening comparison metrics
 #'
-#' Computes accuracy, sensitivity, specificity, precision, F1, and
-#' Cohen's kappa from the comparison.
+#' Computes accuracy, sensitivity, specificity, precision, F1, Cohen's kappa,
+#' and 95% Wilson score CIs for sensitivity and specificity.
 #'
 #' @param comparison_df A tibble from `compare_screening_decisions()`.
-#' @param positive Character. The positive class. Default "include".
+#' @param positive Character. The positive class. Default `"include"`.
+#' @param stage Character. Optional label for this screening stage (e.g.
+#'   `"abstract"` or `"fulltext"`). Stored as a column in the output when
+#'   provided.
 #'
-#' @return A tibble with one row and metric columns.
-summarise_comparison <- function(comparison_df, positive = "include") {
+#' @return A one-row tibble with metric columns including Wilson 95% CIs for
+#'   sensitivity and specificity.
+summarise_comparison <- function(comparison_df,
+                                 positive = "include",
+                                 stage = NULL) {
   cm <- compute_confusion_matrix(comparison_df, positive = positive)
 
   n <- cm$tp + cm$fp + cm$tn + cm$fn
-  accuracy <- (cm$tp + cm$tn) / n
+  accuracy    <- (cm$tp + cm$tn) / n
   sensitivity <- cm$tp / max(cm$tp + cm$fn, 1)
   specificity <- cm$tn / max(cm$tn + cm$fp, 1)
-  precision <- cm$tp / max(cm$tp + cm$fp, 1)
-  f1 <- 2 * (precision * sensitivity) / max(precision + sensitivity, 1e-10)
+  precision   <- cm$tp / max(cm$tp + cm$fp, 1)
+  f1          <- 2 * (precision * sensitivity) /
+                   max(precision + sensitivity, 1e-10)
 
   # Cohen's kappa
   p_observed <- accuracy
@@ -156,18 +189,32 @@ summarise_comparison <- function(comparison_df, positive = "include") {
   )
   kappa <- (p_observed - p_expected) / max(1 - p_expected, 1e-10)
 
-  tibble::tibble(
-    n_total = n,
-    n_agree = cm$tp + cm$tn,
-    accuracy = round(accuracy, 3),
-    sensitivity = round(sensitivity, 3),
-    specificity = round(specificity, 3),
-    precision = round(precision, 3),
-    f1 = round(f1, 3),
-    kappa = round(kappa, 3),
-    tp = cm$tp,
-    fp = cm$fp,
-    tn = cm$tn,
-    fn = cm$fn
+  # Wilson 95% CIs for sensitivity and specificity
+  sens_ci <- wilson_ci(cm$tp, cm$tp + cm$fn)
+  spec_ci <- wilson_ci(cm$tn, cm$tn + cm$fp)
+
+  out <- tibble::tibble(
+    n_total             = n,
+    n_agree             = cm$tp + cm$tn,
+    accuracy            = round(accuracy, 3),
+    sensitivity         = round(sensitivity, 3),
+    sensitivity_lower   = sens_ci[["lower"]],
+    sensitivity_upper   = sens_ci[["upper"]],
+    specificity         = round(specificity, 3),
+    specificity_lower   = spec_ci[["lower"]],
+    specificity_upper   = spec_ci[["upper"]],
+    precision           = round(precision, 3),
+    f1                  = round(f1, 3),
+    kappa               = round(kappa, 3),
+    tp                  = cm$tp,
+    fp                  = cm$fp,
+    tn                  = cm$tn,
+    fn                  = cm$fn
   )
+
+  if (!is.null(stage)) {
+    out <- dplyr::mutate(out, stage = stage, .before = 1)
+  }
+
+  out
 }

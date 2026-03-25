@@ -132,6 +132,79 @@ read_markdown_paper <- function(md_path) {
   paste(readLines(md_path, warn = FALSE), collapse = "\n")
 }
 
+#' Read citation data from a CSV file for abstract screening
+#'
+#' Reads a CSV file containing title and abstract data for stage-1 abstract
+#' screening. Column names are standardised via `janitor::clean_names()`.
+#'
+#' @param csv_path Character. Path to the CSV file.
+#' @param id_col Character or NULL. Column to use as citation identifier.
+#'   If NULL (default), a sequential integer `citation_id` is generated.
+#' @param title_col Character. Name of the title column (after
+#'   `janitor::clean_names()` normalisation). Default `"title"`.
+#' @param abstract_col Character. Name of the abstract column (after
+#'   `janitor::clean_names()` normalisation). Default `"abstract"`.
+#'
+#' @return A tibble with columns: `citation_id`, `title`, `abstract`, plus
+#'   any additional columns present in the CSV.
+read_citation_csv <- function(csv_path,
+                              id_col = NULL,
+                              title_col = "title",
+                              abstract_col = "abstract") {
+  if (!file.exists(csv_path)) {
+    cli::cli_abort("Citation CSV not found: {.path {csv_path}}")
+  }
+
+  raw <- readr::read_csv(csv_path, show_col_types = FALSE) |>
+    janitor::clean_names()
+
+  required <- c(title_col, abstract_col)
+  missing <- setdiff(required, names(raw))
+  if (length(missing) > 0) {
+    cli::cli_abort(c(
+      "x" = "Required columns not found in {.path {basename(csv_path)}}: {.val {missing}}",
+      "i" = "Available columns: {.val {names(raw)}}",
+      "i" = "Use {.arg title_col} and {.arg abstract_col} to specify the correct column names."
+    ))
+  }
+
+  # Generate or extract citation ID
+  if (!is.null(id_col)) {
+    if (!id_col %in% names(raw)) {
+      cli::cli_abort(c(
+        "x" = "ID column {.val {id_col}} not found.",
+        "i" = "Available columns: {.val {names(raw)}}"
+      ))
+    }
+    raw <- raw |> dplyr::rename(citation_id = dplyr::all_of(id_col))
+  } else {
+    raw <- raw |> dplyr::mutate(citation_id = dplyr::row_number(), .before = 1)
+  }
+
+  # Ensure title and abstract are character columns
+  raw <- raw |>
+    dplyr::mutate(
+      dplyr::across(
+        dplyr::all_of(c(title_col, abstract_col)),
+        as.character
+      )
+    )
+
+  # Standardise to expected column names
+  if (title_col != "title") {
+    raw <- raw |> dplyr::rename(title = dplyr::all_of(title_col))
+  }
+  if (abstract_col != "abstract") {
+    raw <- raw |> dplyr::rename(abstract = dplyr::all_of(abstract_col))
+  }
+
+  cli::cli_alert_success(
+    "Loaded {nrow(raw)} citation{?s} from {.path {basename(csv_path)}}."
+  )
+
+  raw
+}
+
 #' Read all markdown papers from a directory
 #'
 #' @param md_dir Character. Path to directory containing markdown files.
